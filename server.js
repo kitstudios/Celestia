@@ -68,8 +68,8 @@ fastify.register(session, {
 // Just send some info at the home route
 fastify.get("/api", (request, reply) => {
   const data = {
-    title: "Kit Network API",
-    intro: "This is the API that directly communicates with Kit Network",
+    title: "Celestia Project API",
+    intro: "Theses are the endpoints created by Celestia.",
     routes: routes.endpoints
   };
   reply.status(200).send(data);
