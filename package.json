@@ -1,7 +1,7 @@
 {
-  "name": "glitch-blank-sqlite",
-  "version": "0.2.0",
-  "description": "A Node app with SQLite database, instantly up and running.",
+  "name": "celestia-project",
+  "version": "0.6.5a",
+  "description": "Celestia is a nodeJS server software that starts up an API using data from a MySQL/SQLite database.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
