@@ -1,6 +1,6 @@
 {
   "name": "celestia-project",
-  "version": "0.6.5a",
+  "version": "0.8.0b",
   "description": "Celestia is a nodeJS server software that starts up an API using data from a MySQL/SQLite database.",
   "main": "server.js",
   "scripts": {

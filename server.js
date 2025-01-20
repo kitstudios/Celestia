@@ -6,10 +6,9 @@
 
 const fastify = require('fastify')({ logger: true });
 
-
-const crypto = require('crypto')
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
-const cookie = require('@fastify/cookie')
+const cookie = require('@fastify/cookie');
 const session = require('@fastify/session');
 const saltRounds = 10;
 
@@ -22,37 +21,32 @@ fastify.register(require("@fastify/cors"), {
 });
 
 const db = require("./sqlite.js");
-const errorMessage = "Whoops! Error connecting to the database–please try again!";
-const verifyUserAndToken = async (request, reply, next) => {
-    const token = request.headers['authorization'];
-    const userId = request.body.userId;
+const errorMessage = "Whoops! Error connecting to the database, please try again!";
+const verifyUserAndToken = async (request, reply) => {
+  const token = request.headers['authorization'];
+  const userId = request.body.userId;
 
-    if (!token) {
-        return reply.status(403).send({ message: 'No token provided.' });
-    }
+  if (!token) {
+    return reply.status(403).send({ message: 'No token provided.' });
+  }
 
-    if (!userId) {
-        return reply.status(400).send({ message: 'User ID is required.' });
-    }
+  if (!userId) {
+    return reply.status(400).send({ message: 'User ID is required.' });
+  }
 
-    try {
-        const user = await db.getUserByToken(token);
-        if (user && user.id === parseInt(userId)) {
-            request.user = user; // Attach user object to the request for further processing
-            next();
-        } else {
-            return reply.status(401).send({ message: 'Failed to authenticate token and user ID.' });
-        }
-    } catch (error) {
-        console.error('Token and user ID verification error:', error);
-        return reply.status(500).send({ message: 'Failed to authenticate token and user ID.' });
+  try {
+    const user = await db.getUserByToken(token);
+    if (user && user.id === parseInt(userId)) {
+      request.user = user; // Attach user object to the request for further processing
+      return; // This will continue to the next step in Fastify
+    } else {
+      return reply.status(401).send({ message: 'Failed to authenticate token and user ID.' });
     }
+  } catch (error) {
+    console.error('Token and user ID verification error:', error);
+    return reply.status(500).send({ message: 'Failed to authenticate token and user ID.' });
+  }
 };
-
-
-
-
-
 
 // OnRoute hook to list endpoints
 const routes = { endpoints: [] };
@@ -61,7 +55,7 @@ fastify.addHook("onRoute", routeOptions => {
 });
 fastify.register(cookie);
 fastify.register(session, {
-  secret: process.env.ADMIN_KEY, // Change this to a secure password',
+  secret: process.env.ADMIN_KEY, // Change this to a secure password
   cookie: { secure: false } // Set to true if using HTTPS
 });
 
@@ -69,7 +63,7 @@ fastify.register(session, {
 fastify.get("/api", (request, reply) => {
   const data = {
     title: "Celestia Project API",
-    intro: "Theses are the endpoints created by Celestia.",
+    intro: "These are the endpoints created by Celestia.",
     routes: routes.endpoints
   };
   reply.status(200).send(data);
@@ -109,7 +103,7 @@ fastify.post("/api/register", async (request, reply) => {
       const profileSuccess = await db.addProfile(result.userId, '', '');
       if (profileSuccess) {
         data.success = true;
-        data.userId = result.userId; // Send back the user ID
+        data.userId = result.userId; // Include userId in the response
         return reply.status(201).send(data);
       } else {
         data.success = false;
@@ -128,47 +122,45 @@ fastify.post("/api/register", async (request, reply) => {
   }
 });
 
+
 // Login user
 fastify.post("/api/login", async (request, reply) => {
-const { username, password } = request.body;
-let data = {};
+  const { username, password } = request.body;
+  let data = {};
 
-if (!username || !password) {
-  data.success = false;
-  return reply.status(400).send(data);
-} else {
-  
-}
-
-try {
-  const user = await db.getUserByUsername(username);
-  if (user && await bcrypt.compare(password, user.password)) {
-    const token = crypto.randomBytes(16).toString('hex');
-    const encryptedToken = await bcrypt.hash(token, saltRounds);
-    await db.storeToken(user.id, encryptedToken);
-    data.success = true;
-    data.userId = user.id;
-    data.nameofuser = user.username;
-    data.token = token; // Send the plain token to the client
-    return reply.status(200).send(data);
-
-  } else {
+  if (!username || !password) {
     data.success = false;
-    return reply.status(401).send(data);
+    return reply.status(400).send(data);
   }
-} catch (error) {
-  console.error(error);
-  data.success = false;
-  return reply.status(500).send(data);
-}
+
+  try {
+    const user = await db.getUserByUsername(username);
+    if (user && await bcrypt.compare(password, user.password)) {
+      const token = crypto.randomBytes(16).toString('hex');
+      const encryptedToken = await bcrypt.hash(token, saltRounds);
+      await db.storeToken(user.id, encryptedToken);
+      data.success = true;
+      data.userId = user.id;
+      data.nameofuser = user.username;
+      data.token = token; // Send the plain token to the client
+      return reply.status(200).send(data);
+    } else {
+      data.success = false;
+      return reply.status(401).send(data);
+    }
+  } catch (error) {
+    console.error(error);
+    data.success = false;
+    return reply.status(500).send(data);
+  }
 });
 
-// Return the chat messages from the database helper script - no auth
-fastify.get("/api/messages", async (request, reply) => {
+// Return the chat posts from the database helper script - no auth
+fastify.get("/api/posts", async (request, reply) => {
   let data = {};
   try {
-    data.chat = await db.getMessages();
-    const status = data.chat ? 200 : 400;
+    data.posts = await db.getPosts();
+    const status = data.posts ? 200 : 400;
     reply.status(status).send(data);
   } catch (error) {
     console.error(error);
@@ -177,62 +169,47 @@ fastify.get("/api/messages", async (request, reply) => {
   }
 });
 
-fastify.post("/api/message", async (request, reply) => {
-    let data = {};
-    const token = request.headers['authorization'];
-    const userId = request.body.userId;
-    const { message } = request.body;
+// Add new post (auth)
+fastify.post("/api/post", { preHandler: verifyUserAndToken }, async (request, reply) => {
+  let data = {};
+  const userId = request.body.userId; // Get userId from the request body
+  const post = request.body.post; // Get post from the request body
+  const timestamp = new Date().toISOString(); // Generate current timestamp if not provided
 
-    if (!token) {
-        console.log('No token provided'); // Debugging
-        return reply.status(403).send({ message: 'No token provided.' });
-    }
+  // Add logging for debugging
+  console.log("Received request to add post:", { userId, post, timestamp });
 
-    if (!userId) {
-        console.log('User ID is required'); // Debugging
-        return reply.status(400).send({ message: 'User ID is required.' });
-    }
-
+  if (!userId || !request.body || !post) {
+    data.success = false;
+    reply.status(400).send(data);
+  } else {
     try {
-        const user = await db.getUserByToken(token);
-        if (!user || user.id !== parseInt(userId)) {
-            console.log('Failed to authenticate token and user ID'); // Debugging
-            return reply.status(401).send({ message: 'Failed to authenticate token and user ID.' });
-        }
-
-        const timestamp = new Date().toISOString();
-        console.log('Generated timestamp:', timestamp); // Logging the timestamp
-
-        data.success = await db.addMessage(message, userId, timestamp);
-        if (data.success) {
-            console.log('Add message result:', data.success); // Logging the successful result
-            return reply.status(201).send(data);
-        } else {
-            console.error('Failed to add message'); // Logging the failure
-            return reply.status(400).send(data);
-        }
+      data.success = await db.addPost(post, userId, timestamp); // Pass userId and timestamp to the database function
+      console.log("Post added to database:", { post, userId, timestamp });
+      const status = data.success ? 201 : 400;
+      reply.status(status).send(data);
     } catch (error) {
-        console.error('Error:', error); // Debugging
-        data.success = false;
-        return reply.status(500).send(data);
+      console.error("Error adding post:", error);
+      data.success = false;
+      reply.status(500).send(data);
     }
+  }
 });
 
 
 
-
-fastify.put("/api/message", { preHandler: verifyUserAndToken }, async (request, reply) => {
-  const { id, message } = request.body;
+fastify.put("/api/post", { preHandler: verifyUserAndToken }, async (request, reply) => {
+  const { id, post } = request.body;
   const userId = request.user.id; // Use the user ID from the authenticated user
   let data = {};
 
-  if (!id || !message) {
+  if (!id || !post) {
     data.success = false;
     return reply.status(400).send(data);
   }
 
   try {
-    data.success = await db.updateMessage(id, userId, message);
+    data.success = await db.updatePost(id, userId, post);
     return reply.status(data.success ? 201 : 400).send(data);
   } catch (error) {
     console.error(error);
@@ -241,32 +218,28 @@ fastify.put("/api/message", { preHandler: verifyUserAndToken }, async (request, 
   }
 });
 
-fastify.delete("/api/message", { preHandler: verifyUserAndToken }, async (request, reply) => {
-    const userId = request.body.userId; // Get userId from the request body
-    const messageId = request.body.messageId; // Get messageId from the request body
-    let data = {};
+fastify.delete("/api/post", { preHandler: verifyUserAndToken }, async (request, reply) => {
+  const userId = request.body.userId; // Get userId from the request body
+  const postId = request.body.postId; // Get postId from the request body
+  let data = {};
 
-    if (!messageId) {
-        data.success = false;
-        return reply.status(400).send(data);
-    }
+  if (!postId) {
+    data.success = false;
+    return reply.status(400).send(data);
+  }
 
-    try {
-        const message = await db.getMessageById(messageId);
-        if (message && message.userId === parseInt(userId)) {
-            data.success = await db.deleteMessage(messageId);
-            return reply.status(data.success ? 201 : 400).send(data);
-        } else {
-            return reply.status(403).send({ success: false, error: "You do not have permission to delete this message." });
-        }
-    } catch (error) {
-        return reply.status(500).send({ success: false, error: "Internal Server Error" });
+  try {
+    const post = await db.getPostById(postId);
+    if (post && post.userId === parseInt(userId)) {
+      data.success = await db.deletePost(postId);
+      return reply.status(data.success ? 201 : 400).send(data);
+    } else {
+      return reply.status(403).send({ success: false, error: "You do not have permission to delete this post." });
     }
+  } catch (error) {
+    return reply.status(500).send({ success: false, error: "Internal Server Error" });
+  }
 });
-
-
-
-
 
 // Get all users (no auth)
 fastify.get("/api/users", async (request, reply) => {
@@ -382,34 +355,28 @@ fastify.get("/api/profile/:id", async (request, reply) => {
 });
 
 // Update user profile
-fastify.post("/api/profile/:id", async (request, reply) => {
-const { id } = request.params;
-const { bio, profilePic } = request.body;
-let data = {};
+fastify.put("/api/profile", { preHandler: verifyUserAndToken }, async (request, reply) => {
+  const { bio, profilePic } = request.body;
+  const userId = request.user.id; // Use the user ID from the authenticated user
 
-if (!id) {
-  data.success = false;
-  data.message = 'User ID is required.';
-  return reply.status(400).send(data);
-}
+  let data = {};
 
-try {
-  const result = await db.updateProfile(id, bio, profilePic);
-  if (result) {
-    data.success = true;
-    return reply.status(200).send(data);
-  } else {
+  if (!bio || !profilePic) {
     data.success = false;
-    data.message = 'Failed to update profile.';
+    return reply.status(400).send(data);
+  }
+
+  try {
+    data.success = await db.updateProfile(userId, bio, profilePic);
+    return reply.status(data.success ? 201 : 400).send(data);
+  } catch (error) {
+    console.error(error);
+    data.success = false;
     return reply.status(500).send(data);
   }
-} catch (error) {
-  console.error('Error updating profile:', error);
-  data.success = false;
-  data.message = 'Internal Server Error.';
-  return reply.status(500).send(data);
-}
 });
+
+
 
 const authorized = key => {
   return key && key === process.env.ADMIN_KEY;
