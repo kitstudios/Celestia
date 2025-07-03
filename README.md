@@ -1,4 +1,5 @@
 # Celestia
+# As of 07/03/2025, Celestia's development has been paused. 
 Current version: 0.8.0b
 <br>
 <br>
